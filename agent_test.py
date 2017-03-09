@@ -477,7 +477,7 @@ class Project1Test(unittest.TestCase):
                 method, test_depth, first_branch, move))
 
 
-    @timeout(20)
+    #@timeout(20)
     # @unittest.skip("Skip iterative deepening test.")  # Uncomment this line to skip test
     def test_get_move(self):
         """ Test iterative deepening in CustomPlayer.get_move by placing an
