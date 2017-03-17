@@ -48,17 +48,17 @@ def custom_score(game, player):
 
     s1 = set(game.get_legal_moves(player))
     s2 = set(game.get_legal_moves(game.get_opponent(player)))
-    return overlapping_move_count(s1,s2)
+    return non_overlapping_move_count(s1,s2)
 
 
-def overlapping_move_count(s1,s2):
+def non_overlapping_move_count(s1,s2):
     '''
     This heuristic returns the number of non overlapping next moves player 1 has with player 2
     :param s1: set of moves for player 1
     :param s2: set of moves for player
     :return: The number of moves reachable by player 1 not reachable by player 2
     '''
-    return float(len(s1&s2))
+    return float(len(s1-s2))
 
 
 class CustomPlayer:
@@ -171,7 +171,10 @@ class CustomPlayer:
             else:
 
                 if self.iterative:
-                    self.search_depth = 12
+                    if game.move_count < 18:
+                        self.search_depth = 7
+                    else:
+                        self.search_depth = 15
                     for depth_level in range(1,self.search_depth+1):
                         _,self.best_current_move = self.alphabeta(game,depth_level,True)
                         max_depth = depth_level
@@ -190,7 +193,8 @@ class CustomPlayer:
 
 
         # Return the best move from the last completed search iteration
-        logging.info("max depth level: {}".format(max_depth))
+        #if max_depth > 0:
+         #   logging.info("max depth level: {}\n Move count: {} ".format(max_depth,game.move_count))
         return self.best_current_move
 
     def find_midpoint(self,game):
