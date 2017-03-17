@@ -6,7 +6,7 @@ augment the test suite with your own test cases to further test your code.
 You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
-import random
+from random import randint
 import logging
 
 logging.basicConfig(filename='debug.log',format='%(levelname)s:\n%(message)s',level=logging.DEBUG)
@@ -46,9 +46,19 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
+    s1 = set(game.get_legal_moves(player))
+    s2 = set(game.get_legal_moves(game.get_opponent(player)))
+    return overlapping_move_count(s1,s2)
+
+
+def overlapping_move_count(s1,s2):
+    '''
+    This heuristic returns the number of non overlapping next moves player 1 has with player 2
+    :param s1: set of moves for player 1
+    :param s2: set of moves for player
+    :return: The number of moves reachable by player 1 not reachable by player 2
+    '''
+    return float(len(s1&s2))
 
 
 class CustomPlayer:
@@ -88,6 +98,7 @@ class CustomPlayer:
         self.score = score_fn
         self.method = method
         self.time_left = 0.
+        self.best_current_move = (-1,-1)
         self.TIMER_THRESHOLD = timeout
 
     def get_move(self, game, legal_moves, time_left):
@@ -140,30 +151,58 @@ class CustomPlayer:
             # automatically catch the exception raised by the search method
             # when the timer gets close to expiring
 
-            move = (-1,-1)
+
+            self.best_current_move = (-1,-1)
+            random_choice_threshold = 1
+            mid_game_boundary = 4
+            end_game_search_depth = 5
+            if len(legal_moves) == 0:
+                return self.best_current_move
+            max_depth = -1
+            self.best_current_move = legal_moves[randint(0, len(legal_moves) - 1)]
 
             if self.method == 'minimax':
                 if self.iterative:
-                    self.search_depth = 8
-                    for depth_level in range(self.search_depth):
-                        _, move = self.minimax(game, depth_level, True)
+                    self.search_depth = 6
+                    for depth_level in range(1,self.search_depth + 1):
+                        _, self.best_current_move = self.minimax(game, depth_level, True)
                 else:
-                    _, move = self.minimax(game,self.search_depth,True)
+                    _, self.best_current_move = self.minimax(game,self.search_depth,True)
             else:
-                _,move = self.alphabeta(game,self.search_depth,True)
+
+                if self.iterative:
+                    self.search_depth = 12
+                    for depth_level in range(1,self.search_depth+1):
+                        _,self.best_current_move = self.alphabeta(game,depth_level,True)
+                        max_depth = depth_level
+
+
+                else:
+                    _,_ = self.alphabeta(game,self.search_depth,True)
 
 
 
 
         except Timeout:
-            # Handle any actions required at timeout, if necessary
-            pass
+            if self.best_current_move == None:
+                self.best_current_move = legal_moves[0]
+
+
 
         # Return the best move from the last completed search iteration
-        return move
+        logging.info("max depth level: {}".format(max_depth))
+        return self.best_current_move
 
-
+    def find_midpoint(self,game):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
+        width = game.width
+        height = game.height
+        return (int(height/2),int(width/2))
     def terminial_test(self,game):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
+
         moves = game.get_legal_moves()
         return len(moves) == 0
 
@@ -177,8 +216,10 @@ class CustomPlayer:
         This function simulates the actions being carried as you traverse
         the minimax tree.  We perform the max/min action based on the depth level.
         '''
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
         if self.terminial_test(game) or depth > self.search_depth:
-            return self.score(game,self),None
+            return self.score(game,self),game.get_player_location(self)
 
 
         moves = game.get_legal_moves()
@@ -289,14 +330,17 @@ class CustomPlayer:
         moves = game.get_legal_moves()
         self.search_depth = depth
 
-        f,alpha,beta,action = self.calculate_value(game, 1,alpha,beta)
+        f,alpha,beta,self.best_current_move = self.calculate_value(game, 1,alpha,beta)
 
-        return f, action
+        return f, self.best_current_move
 
     def calculate_value(self,game, depth,alpha=float("-inf"), beta=float("inf")):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
+
         if self.terminial_test(game) or depth > self.search_depth:
             leaf_score = self.score(game,self)
-            return leaf_score, alpha, beta,None
+            return leaf_score, alpha, beta,game.get_player_location(self)
 
         moves = game.get_legal_moves()
 
@@ -310,13 +354,13 @@ class CustomPlayer:
             if depth % 2 == 0 :
                 v = (min(v, tmp))
                 if v <= alpha:
-                    return v, alpha, beta,None
+                    return v, alpha, beta,updated_board.get_player_location(self)
                 beta = min(beta,v)
                 results.append([beta, move])
             else:
                 v = (max(v, tmp))
                 if v >= beta:
-                    return v, alpha, beta, None
+                    return v, alpha, beta, updated_board.get_player_location(self)
                 alpha = max(alpha, v)
                 results.append([alpha,move])
 
@@ -327,6 +371,9 @@ class CustomPlayer:
 
 
     def find_best_move(self,results,value):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
+
         actions = [a for a in results if a[0] == value]
         return actions[0][1]
 
