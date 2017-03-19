@@ -7,9 +7,7 @@ You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
 from random import randint
-import logging
 
-logging.basicConfig(filename='debug.log',format='%(levelname)s:\n%(message)s',level=logging.DEBUG)
 
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
@@ -153,12 +151,8 @@ class CustomPlayer:
 
 
             self.best_current_move = (-1,-1)
-            random_choice_threshold = 1
-            mid_game_boundary = 4
-            end_game_search_depth = 5
             if len(legal_moves) == 0:
                 return self.best_current_move
-            max_depth = -1
             self.best_current_move = legal_moves[randint(0, len(legal_moves) - 1)]
 
             if self.method == 'minimax':
@@ -174,7 +168,7 @@ class CustomPlayer:
                     self.search_depth = 12
                     for depth_level in range(1,self.search_depth+1):
                         _,self.best_current_move = self.alphabeta(game,depth_level,True)
-                        max_depth = depth_level
+
 
 
                 else:
@@ -187,23 +181,12 @@ class CustomPlayer:
             if self.best_current_move == None:
                 self.best_current_move = legal_moves[0]
 
-
-
-        # Return the best move from the last completed search iteration
-        logging.info("max depth level: {}".format(max_depth))
         return self.best_current_move
 
-    def find_midpoint(self,game):
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-        width = game.width
-        height = game.height
-        return (int(height/2),int(width/2))
-    def terminial_test(self,game):
+    def terminal_test(self,moves):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        moves = game.get_legal_moves()
         return len(moves) == 0
 
     def perform_action(self,game,depth):
@@ -218,11 +201,12 @@ class CustomPlayer:
         '''
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
-        if self.terminial_test(game) or depth > self.search_depth:
+
+        moves = game.get_legal_moves()
+        if self.terminal_test(moves) or depth > self.search_depth:
             return self.score(game,self),game.get_player_location(self)
 
 
-        moves = game.get_legal_moves()
         score, results =0., []
         for move in moves:
             updated_board = game.forecast_move(move)
@@ -271,10 +255,6 @@ class CustomPlayer:
             raise Timeout()
 
         moves = game.get_legal_moves()
-
-        #logging.info("Root's Legal moves:%s",moves)
-        #logging.debug(game.to_string())
-
         self.search_depth = depth
         return self.perform_action(game,1)
 
@@ -329,22 +309,29 @@ class CustomPlayer:
 
         moves = game.get_legal_moves()
         self.search_depth = depth
-
         f,alpha,beta,self.best_current_move = self.calculate_value(game, 1,alpha,beta)
-
         return f, self.best_current_move
 
     def calculate_value(self,game, depth,alpha=float("-inf"), beta=float("inf")):
+        '''
+
+        :param game: The current board state at this depth level
+        :param depth: The depth level of our search
+        :param alpha: The highest value that we have found thus far
+        :param beta: The lowest value that we have found thus far
+        :return: <float,float,float,(int,int)> A tuple of the
+        '''
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        if self.terminial_test(game) or depth > self.search_depth:
+        moves = game.get_legal_moves()
+        if self.terminal_test(moves) or depth > self.search_depth:
             leaf_score = self.score(game,self)
             return leaf_score, alpha, beta,game.get_player_location(self)
 
-        moves = game.get_legal_moves()
 
-        v = (float('-inf'),float('inf'))[depth % 2 == 0]
+
+        optimal_value = (float('-inf'),float('inf'))[depth % 2 == 0]
 
         results = []
         for move in moves:
@@ -352,28 +339,34 @@ class CustomPlayer:
             tmp, _, _,_ = self.calculate_value(updated_board, depth + 1, alpha, beta)
 
             if depth % 2 == 0 :
-                v = (min(v, tmp))
-                if v <= alpha:
-                    return v, alpha, beta,updated_board.get_player_location(self)
-                beta = min(beta,v)
+                optimal_value = (min(optimal_value, tmp))
+                if optimal_value <= alpha:
+                    return optimal_value, alpha, beta,updated_board.get_player_location(self)
+                beta = min(beta,optimal_value)
                 results.append([beta, move])
             else:
-                v = (max(v, tmp))
-                if v >= beta:
-                    return v, alpha, beta, updated_board.get_player_location(self)
-                alpha = max(alpha, v)
+                optimal_value = (max(optimal_value, tmp))
+                if optimal_value >= beta:
+                    return optimal_value, alpha, beta, updated_board.get_player_location(self)
+                alpha = max(alpha, optimal_value)
                 results.append([alpha,move])
 
         best_action = self.find_best_move(results,beta) if depth % 2 == 0 else self.find_best_move(results,alpha)
 
 
-        return v, alpha, beta,best_action
+        return optimal_value, alpha, beta,best_action
 
 
-    def find_best_move(self,results,value):
+    def find_best_move(self, results, constraint_value):
+        '''
+
+        :param results: <list> list of moves combined with their optimal value at that depth level
+        :param constraint_value:<float> Either the alpha or beta value
+        :return: <int,int> the first move where it's optimal value matches the constraint value
+        '''
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        actions = [a for a in results if a[0] == value]
+        actions = [a for a in results if a[0] == constraint_value]
         return actions[0][1]
 

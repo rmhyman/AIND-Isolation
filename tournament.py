@@ -32,6 +32,9 @@ from sample_players import open_move_score
 from sample_players import improved_score
 from game_agent import CustomPlayer
 from game_agent import custom_score
+import logging
+
+logging.basicConfig(filename='overlapping_results.log',format='%(levelname)s:\n%(message)s',level=logging.DEBUG)
 
 NUM_MATCHES = 5  # number of matches against each opponent
 TIME_LIMIT = 150  # number of milliseconds before timeout
@@ -78,6 +81,7 @@ def play_match(player1, player2):
     # play both games and tally the results
     for game in games:
         winner, _, termination = game.play(time_limit=TIME_LIMIT)
+        #.info("Termination: {}".format(termination))
 
         if player1 == winner:
             num_wins[player1] += 1
@@ -176,7 +180,7 @@ def main():
         print("\n\nResults:")
         print("----------")
         print("{!s:<15}{:>10.2f}%".format(agentUT.name, win_ratio))
-
+        logging.info("{}:{}".format(agentUT.name, win_ratio))
 
 if __name__ == "__main__":
     main()
