@@ -46,19 +46,36 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    s1 = set(game.get_legal_moves(player))
-    s2 = set(game.get_legal_moves(game.get_opponent(player)))
-    return overlapping_move_count(s1,s2)
+    blank_spaces = game.get_blank_spaces()
+    my_loc = game.get_player_location(player)
+    _, split_point = find_midpoint(game)
+    return blank_space_count(blank_spaces,my_loc,split_point)
 
 
-def overlapping_move_count(s1,s2):
+
+def find_midpoint(game):
+    width = game.width
+    height = game.height
+    return (int(height/2),int(width/2))
+
+def blank_space_count(bs,my_loc,split_point):
     '''
-    This heuristic returns the number of non overlapping next moves player 1 has with player 2
-    :param s1: set of moves for player 1
-    :param s2: set of moves for player
-    :return: The number of moves reachable by player 1 not reachable by player 2
+
+    :param bs: <list> List of blank spaces on the board
+    :param my_loc: <int,int> Position of the player's location
+    :param split_point: <int> Vertical pivot point to split up the list of blank spaces
+    :return: <float> After performing a vertical split on the board,  return
+    the number of blank spaces that are on the same side as the current location
     '''
-    return float(len(s1&s2))
+
+
+    vertical_split = [s for s in bs if s[1] < split_point] if my_loc[1] < split_point \
+        else  [s for s in bs if s[1] > split_point]
+    return float(len(vertical_split))
+
+
+
+
 
 
 class CustomPlayer:
@@ -193,12 +210,7 @@ class CustomPlayer:
         logging.info("max depth level: {}".format(max_depth))
         return self.best_current_move
 
-    def find_midpoint(self,game):
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-        width = game.width
-        height = game.height
-        return (int(height/2),int(width/2))
+
     def terminial_test(self,game):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
